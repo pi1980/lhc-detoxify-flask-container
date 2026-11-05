@@ -6,6 +6,8 @@ HTTP API to classify the toxicity of text messages. This was inspired by [detoxi
 * Three models loaded directly `multilingual` `original-small` `original`
 * Build fixes I encountered
 * Memory leaks I found were fixed
+* Multistaging docker image build
+* using gunicorn for production
 
 ## Usage
 

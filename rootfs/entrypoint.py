@@ -1,16 +1,11 @@
-#!/usr/bin/env python
-
 import os
-from flask import Flask, request, Response
+from flask import Flask, request, jsonify
 from detoxify import Detoxify
-import json
-import gc
 
 app = Flask(__name__)
 
 # Initialize models outside the request handler
-# Model loading based on environment variable
-MODEL_NAME = os.environ.get("DETOXIFY_MODEL", "original-small")  # Default to original-small
+MODEL_NAME = os.environ.get("DETOXIFY_MODEL", "original-small")
 ALLOWED_MODELS = ['multilingual', 'original-small', 'original']
 
 if MODEL_NAME not in ALLOWED_MODELS:
@@ -18,30 +13,31 @@ if MODEL_NAME not in ALLOWED_MODELS:
 
 try:
     model = Detoxify(MODEL_NAME)
-    print(f"Model '{MODEL_NAME}' loaded successfully.")  # Confirmation message
+    print(f"Model '{MODEL_NAME}' loaded successfully.")
 except Exception as e:
-    print(f"Error loading model '{MODEL_NAME}': {e}") #Print Error Message
-    exit(1) #Exit if model load fails
+    print(f"Error loading model '{MODEL_NAME}': {e}")
+    exit(1)
 
-@app.route('/', methods=['GET'])
+@app.route('/', methods=['GET', 'POST'])
 def detox():
-    text = request.args.get('text')
+    # Support POST for larger text blocks, fallback to GET for quick tests
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        text = data.get('text')
+    else:
+        text = request.args.get('text')
+
+    # Guard against empty inputs before invoking the model
+    if not text:
+        return jsonify({"error": "Missing 'text' parameter"}), 400
 
     try:
         results = model.predict(text)
 
-        serializable_results = {}
-        for key, value in results.items():
-            serializable_results[key] = float(value)
+        # Convert numpy floats to Python floats using dictionary comprehension
+        serializable_results = {key: float(value) for key, value in results.items()}
 
-        return Response(json.dumps(serializable_results), mimetype='application/json')
+        return jsonify(serializable_results)
 
     except Exception as e:
-        return Response(json.dumps({"error": str(e)}), status=500, mimetype='application/json')
-
-    finally:
-        gc.collect()
-
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=80)
+        return jsonify({"error": str(e)}), 500
